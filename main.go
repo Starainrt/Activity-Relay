@@ -107,6 +107,7 @@ func main() {
 	http.HandleFunc("/inbox", func(w http.ResponseWriter, r *http.Request) {
 		handleInbox(w, r, decodeActivity)
 	})
-
+	http.HandleFunc("/", HandleIndex)
+	go updateWebInfo()
 	http.ListenAndServe(viper.GetString("relay_bind"), nil)
 }

@@ -8,3 +8,17 @@ relay_servicename: YUKIMOCHI Toot Relay Service
 
 # relay_icon: https://
 # relay_image: https://
+
+permit_mode: true
+allow_max_user: 100
+allow_min_user: 0
+kick_max_user: 200
+kick_min_user: 0
+max_instances: 30
+user_by_total: true
+
+blacklist_mode: false
+whitelist_mode: false
+#blacklist:
+#whitelist:
+#  - "b612\\.me"
