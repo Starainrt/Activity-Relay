@@ -1,18 +1,22 @@
-package main
+package cli
 
 import (
 	"crypto/rsa"
+	"errors"
 	"fmt"
 	"net/url"
+	"os"
 
+	"b612.me/starlog"
+	"b612.me/starmap"
+	"b612.me/staros"
 	"github.com/RichardKnop/machinery/v1"
 	"github.com/RichardKnop/machinery/v1/config"
 	"github.com/go-redis/redis"
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
-	activitypub "github.com/yukimochi/Activity-Relay/ActivityPub"
-	keyloader "github.com/yukimochi/Activity-Relay/KeyLoader"
-	state "github.com/yukimochi/Activity-Relay/State"
+	activitypub "github.com/starainrt/Activity-Relay/ActivityPub"
+	keyloader "github.com/starainrt/Activity-Relay/KeyLoader"
+	"github.com/starainrt/Activity-Relay/conf"
 )
 
 var (
@@ -23,46 +27,58 @@ var (
 
 	hostname        *url.URL
 	hostkey         *rsa.PrivateKey
-	relayState      state.RelayState
+	relayState      conf.RelayState
 	machineryServer *machinery.Server
 )
 
-func initConfig() {
-	viper.SetConfigName("config")
-	viper.AddConfigPath(".")
-	err := viper.ReadInConfig()
-	if err != nil {
-		fmt.Println("Config file is not exists. Use environment variables.")
-		viper.BindEnv("actor_pem")
-		viper.BindEnv("redis_url")
-		viper.BindEnv("relay_bind")
-		viper.BindEnv("relay_domain")
-		viper.BindEnv("relay_servicename")
-	} else {
-		Actor.Summary = viper.GetString("relay_summary")
-		Actor.Icon = activitypub.Image{URL: viper.GetString("relay_icon")}
-		Actor.Image = activitypub.Image{URL: viper.GetString("relay_image")}
+func loadConfigure(configPath string) error {
+	if !staros.Exists(configPath) {
+		starlog.Criticalln("Cannot Found Config File,Please Check")
+		return errors.New("Config File Not Exists")
 	}
-	Actor.Name = viper.GetString("relay_servicename")
+	starlog.Noticeln("Parsing Config File……")
+	if err := conf.Parse(configPath); err != nil {
+		starlog.Criticalln("Cannot Parse Configure File:", err)
+		return err
+	}
+	cfg := starmap.MustGet("config").(conf.RelayConfig)
+	cfg.Version = "1.0.0"
+	starmap.Store("ua", fmt.Sprintf("ActivityPub-Relay V%s +https://%s", cfg.Version, cfg.Domain))
+	starmap.Store("config", cfg)
+	fmt.Printf("Load Config :%+v\n", cfg)
+	return nil
+}
 
-	hostname, err = url.Parse("https://" + viper.GetString("relay_domain"))
+func initConfig() {
+	err := loadConfigure("./config.ini")
+	if err != nil {
+		fmt.Println(err)
+		os.Exit(1)
+	}
+	cfg := starmap.MustGet("config").(conf.RelayConfig)
+	Actor.Summary = cfg.Summary
+	Actor.Icon = activitypub.Image{URL: cfg.Icon}
+	Actor.Image = activitypub.Image{URL: cfg.Image}
+	Actor.Name = cfg.Name
+
+	hostname, err = url.Parse("https://" + cfg.Domain)
 	if err != nil {
 		panic(err)
 	}
-	hostkey, err := keyloader.ReadPrivateKeyRSAfromPath(viper.GetString("actor_pem"))
+	hostkey, err := keyloader.ReadPrivateKeyRSAfromPath(cfg.Key)
 	if err != nil {
 		panic(err)
 	}
-	redisOption, err := redis.ParseURL(viper.GetString("redis_url"))
+	redisOption, err := redis.ParseURL(cfg.Redis)
 	if err != nil {
 		panic(err)
 	}
 	redisClient := redis.NewClient(redisOption)
-	relayState = state.NewState(redisClient, false)
+	relayState = conf.NewState(redisClient, false)
 	var machineryConfig = &config.Config{
-		Broker:          viper.GetString("redis_url"),
+		Broker:          cfg.Redis,
 		DefaultQueue:    "relay",
-		ResultBackend:   viper.GetString("redis_url"),
+		ResultBackend:   cfg.Redis,
 		ResultsExpireIn: 5,
 	}
 	machineryServer, err = machinery.NewServer(machineryConfig)
@@ -73,16 +89,10 @@ func initConfig() {
 	Actor.GenerateSelfKey(hostname, &hostkey.PublicKey)
 }
 
-func buildNewCmd() *cobra.Command {
-	var app = &cobra.Command{}
+func BuildNewCmd(app *cobra.Command) {
+
+	//app.PersistentFlags().StringP("config", "c", "./config.ini", "Config Path")
 	app.AddCommand(domainCmdInit())
 	app.AddCommand(followCmdInit())
 	app.AddCommand(configCmdInit())
-	return app
-}
-
-func main() {
-	initConfig()
-	var app = buildNewCmd()
-	app.Execute()
 }

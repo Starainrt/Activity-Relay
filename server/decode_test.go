@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"bytes"
@@ -9,11 +9,11 @@ import (
 	"strconv"
 	"testing"
 
-	state "github.com/yukimochi/Activity-Relay/State"
+	"github.com/starainrt/Activity-Relay/conf"
 )
 
 func TestDecodeActivity(t *testing.T) {
-	relayState.AddSubscription(state.Subscription{
+	relayState.AddSubscription(conf.Subscription{
 		Domain:   "innocent.yukimochi.io",
 		InboxURL: "https://innocent.yukimochi.io/inbox",
 	})
@@ -43,7 +43,7 @@ func TestDecodeActivity(t *testing.T) {
 }
 
 func TestDecodeActivityWithNoSignature(t *testing.T) {
-	relayState.AddSubscription(state.Subscription{
+	relayState.AddSubscription(conf.Subscription{
 		Domain:   "innocent.yukimochi.io",
 		InboxURL: "https://innocent.yukimochi.io/inbox",
 	})
@@ -67,7 +67,7 @@ func TestDecodeActivityWithNoSignature(t *testing.T) {
 }
 
 func TestDecodeActivityWithNotFoundKeyId(t *testing.T) {
-	relayState.AddSubscription(state.Subscription{
+	relayState.AddSubscription(conf.Subscription{
 		Domain:   "innocent.yukimochi.io",
 		InboxURL: "https://innocent.yukimochi.io/inbox",
 	})
@@ -92,7 +92,7 @@ func TestDecodeActivityWithNotFoundKeyId(t *testing.T) {
 }
 
 func TestDecodeActivityWithInvalidDigest(t *testing.T) {
-	relayState.AddSubscription(state.Subscription{
+	relayState.AddSubscription(conf.Subscription{
 		Domain:   "innocent.yukimochi.io",
 		InboxURL: "https://innocent.yukimochi.io/inbox",
 	})

@@ -1,0 +1,31 @@
+
+
+[relay]
+domain=relay.lab.b612.in
+listen=127.0.0.1:23456
+redis=redis://127.0.0.1:6379
+private_key=./config/actor.pem
+name=B612 Relay Service
+summary=
+icon=
+image=
+
+
+[rule]
+support_authorized_fetch=true
+allow_max_instances=40
+allow_rule_file=
+block_rule_file=
+user_by_active= true
+allow_max_user= 150
+allow_min_user=  0
+kick_max_user= 200
+kick_min_user= 0
+allow_geo=
+block_geo=
+ip_source=
+update_rate= 300
+kick_after_no_response_times= 288
+
+[log]
+level=1

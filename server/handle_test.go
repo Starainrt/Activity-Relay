@@ -1,4 +1,4 @@
-package main
+package server
 
 import (
 	"encoding/json"
@@ -11,12 +11,12 @@ import (
 	"strconv"
 	"testing"
 
-	activitypub "github.com/yukimochi/Activity-Relay/ActivityPub"
-	state "github.com/yukimochi/Activity-Relay/State"
+	activitypub "github.com/starainrt/Activity-Relay/ActivityPub"
+	state "github.com/starainrt/Activity-Relay/State"
 )
 
 const (
-	BlockService state.Config = iota
+	BlockService conf.Config = iota
 	ManuallyAccept
 	CreateAsAnnounce
 )
@@ -529,7 +529,7 @@ func TestHandleInboxValidUnfollow(t *testing.T) {
 	}))
 	defer s.Close()
 
-	relayState.AddSubscription(state.Subscription{
+	relayState.AddSubscription(conf.Subscription{
 		Domain:   domain.Host,
 		InboxURL: "https://mastodon.test.yukimochi.io/inbox",
 	})
@@ -559,7 +559,7 @@ func TestHandleInboxInvalidUnfollow(t *testing.T) {
 	}))
 	defer s.Close()
 
-	relayState.AddSubscription(state.Subscription{
+	relayState.AddSubscription(conf.Subscription{
 		Domain:   domain.Host,
 		InboxURL: "https://mastodon.test.yukimochi.io/inbox",
 	})
@@ -589,7 +589,7 @@ func TestHandleInboxUnfollowAsActor(t *testing.T) {
 	}))
 	defer s.Close()
 
-	relayState.AddSubscription(state.Subscription{
+	relayState.AddSubscription(conf.Subscription{
 		Domain:   domain.Host,
 		InboxURL: "https://mastodon.test.yukimochi.io/inbox",
 	})
@@ -619,11 +619,11 @@ func TestHandleInboxValidCreate(t *testing.T) {
 	}))
 	defer s.Close()
 
-	relayState.AddSubscription(state.Subscription{
+	relayState.AddSubscription(conf.Subscription{
 		Domain:   domain.Host,
 		InboxURL: "https://mastodon.test.yukimochi.io/inbox",
 	})
-	relayState.AddSubscription(state.Subscription{
+	relayState.AddSubscription(conf.Subscription{
 		Domain:   "example.org",
 		InboxURL: "https://example.org/inbox",
 	})
@@ -652,7 +652,7 @@ func TestHandleInboxlimitedCreate(t *testing.T) {
 	}))
 	defer s.Close()
 
-	relayState.AddSubscription(state.Subscription{
+	relayState.AddSubscription(conf.Subscription{
 		Domain:   domain.Host,
 		InboxURL: "https://mastodon.test.yukimochi.io/inbox",
 	})
@@ -680,11 +680,11 @@ func TestHandleInboxValidCreateAsAnnounceNote(t *testing.T) {
 	}))
 	defer s.Close()
 
-	relayState.AddSubscription(state.Subscription{
+	relayState.AddSubscription(conf.Subscription{
 		Domain:   domain.Host,
 		InboxURL: "https://mastodon.test.yukimochi.io/inbox",
 	})
-	relayState.AddSubscription(state.Subscription{
+	relayState.AddSubscription(conf.Subscription{
 		Domain:   "example.org",
 		InboxURL: "https://example.org/inbox",
 	})
@@ -713,11 +713,11 @@ func TestHandleInboxValidCreateAsAnnounceNoNote(t *testing.T) {
 	}))
 	defer s.Close()
 
-	relayState.AddSubscription(state.Subscription{
+	relayState.AddSubscription(conf.Subscription{
 		Domain:   domain.Host,
 		InboxURL: "https://mastodon.test.yukimochi.io/inbox",
 	})
-	relayState.AddSubscription(state.Subscription{
+	relayState.AddSubscription(conf.Subscription{
 		Domain:   "example.org",
 		InboxURL: "https://example.org/inbox",
 	})
@@ -765,7 +765,7 @@ func TestHandleInboxUndo(t *testing.T) {
 	}))
 	defer s.Close()
 
-	relayState.AddSubscription(state.Subscription{
+	relayState.AddSubscription(conf.Subscription{
 		Domain:   domain.Host,
 		InboxURL: "https://mastodon.test.yukimochi.io/inbox",
 	})

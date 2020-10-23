@@ -1,4 +1,4 @@
-package main
+package cli
 
 import (
 	"encoding/json"
@@ -9,8 +9,8 @@ import (
 	"github.com/RichardKnop/machinery/v1/tasks"
 	uuid "github.com/satori/go.uuid"
 	"github.com/spf13/cobra"
-	activitypub "github.com/yukimochi/Activity-Relay/ActivityPub"
-	state "github.com/yukimochi/Activity-Relay/State"
+	activitypub "github.com/starainrt/Activity-Relay/ActivityPub"
+	"github.com/starainrt/Activity-Relay/conf"
 )
 
 func followCmdInit() *cobra.Command {
@@ -101,7 +101,7 @@ func createFollowRequestResponse(domain string, response string) error {
 	pushRegistorJob(data["inbox_url"], jsonData)
 	relayState.RedisClient.Del("relay:pending:" + domain)
 	if response == "Accept" {
-		relayState.AddSubscription(state.Subscription{
+		relayState.AddSubscription(conf.Subscription{
 			Domain:     domain,
 			InboxURL:   data["inbox_url"],
 			ActivityID: data["activity_id"],
@@ -112,7 +112,7 @@ func createFollowRequestResponse(domain string, response string) error {
 	return nil
 }
 
-func createUpdateActorActivity(subscription state.Subscription) error {
+func createUpdateActorActivity(subscription conf.Subscription) error {
 	activity := activitypub.Activity{
 		Context: []string{"https://www.w3.org/ns/activitystreams"},
 		ID:      hostname.String() + "/activities/" + uuid.NewV4().String(),
@@ -132,6 +132,7 @@ func createUpdateActorActivity(subscription state.Subscription) error {
 }
 
 func listFollows(cmd *cobra.Command, args []string) error {
+	initConfig()
 	var domains []string
 	cmd.Println(" - Follow request :")
 	follows, err := relayState.RedisClient.Keys("relay:pending:*").Result()
@@ -150,6 +151,7 @@ func listFollows(cmd *cobra.Command, args []string) error {
 }
 
 func acceptFollow(cmd *cobra.Command, args []string) error {
+	initConfig()
 	var err error
 	var domains []string
 	follows, err := relayState.RedisClient.Keys("relay:pending:*").Result()
@@ -173,6 +175,7 @@ func acceptFollow(cmd *cobra.Command, args []string) error {
 }
 
 func rejectFollow(cmd *cobra.Command, args []string) error {
+	initConfig()
 	var err error
 	var domains []string
 	follows, err := relayState.RedisClient.Keys("relay:pending:*").Result()
@@ -198,6 +201,7 @@ func rejectFollow(cmd *cobra.Command, args []string) error {
 }
 
 func updateActor(cmd *cobra.Command, args []string) error {
+	initConfig()
 	for _, subscription := range relayState.Subscriptions {
 		err := createUpdateActorActivity(subscription)
 		if err != nil {

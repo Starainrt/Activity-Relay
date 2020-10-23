@@ -1,113 +1,98 @@
 package main
 
 import (
-	"crypto/rsa"
+	"context"
+	"errors"
+	"io/ioutil"
+	"os"
+	"os/signal"
+	"syscall"
+
 	"fmt"
-	"net/http"
-	"net/url"
-	"time"
 
-	"github.com/RichardKnop/machinery/v1"
-	"github.com/RichardKnop/machinery/v1/config"
-	"github.com/go-redis/redis"
-	cache "github.com/patrickmn/go-cache"
-	"github.com/spf13/viper"
-	activitypub "github.com/yukimochi/Activity-Relay/ActivityPub"
-	keyloader "github.com/yukimochi/Activity-Relay/KeyLoader"
-	state "github.com/yukimochi/Activity-Relay/State"
+	"b612.me/starmap"
+
+	"github.com/starainrt/Activity-Relay/cli"
+	"github.com/starainrt/Activity-Relay/conf"
+	"github.com/starainrt/Activity-Relay/server"
+	"github.com/starainrt/Activity-Relay/worker"
+
+	"b612.me/starlog"
+	"b612.me/staros"
+	"github.com/spf13/cobra"
 )
 
-var (
-	version string
-
-	// Actor : Relay's Actor
-	Actor activitypub.Actor
-
-	// WebfingerResource : Relay's Webfinger resource
-	WebfingerResource activitypub.WebfingerResource
-
-	// Nodeinfo : Relay's Nodeinfo
-	Nodeinfo activitypub.NodeinfoResources
-
-	hostURL         *url.URL
-	hostPrivatekey  *rsa.PrivateKey
-	relayState      state.RelayState
-	machineryServer *machinery.Server
-	actorCache      *cache.Cache
-)
-
-func initConfig() {
-	viper.SetConfigName("config")
-	viper.AddConfigPath(".")
-	err := viper.ReadInConfig()
-	if err != nil {
-		fmt.Println("Config file is not exists. Use environment variables.")
-		viper.BindEnv("actor_pem")
-		viper.BindEnv("redis_url")
-		viper.BindEnv("relay_bind")
-		viper.BindEnv("relay_domain")
-		viper.BindEnv("relay_servicename")
-	} else {
-		Actor.Summary = viper.GetString("relay_summary")
-		Actor.Icon = activitypub.Image{URL: viper.GetString("relay_icon")}
-		Actor.Image = activitypub.Image{URL: viper.GetString("relay_image")}
-	}
-	Actor.Name = viper.GetString("relay_servicename")
-
-	hostURL, _ = url.Parse("https://" + viper.GetString("relay_domain"))
-	hostPrivatekey, _ = keyloader.ReadPrivateKeyRSAfromPath(viper.GetString("actor_pem"))
-	redisOption, err := redis.ParseURL(viper.GetString("redis_url"))
-	if err != nil {
-		panic(err)
-	}
-	redisClient := redis.NewClient(redisOption)
-	relayState = state.NewState(redisClient, true)
-	relayState.ListenNotify(nil)
-	machineryConfig := &config.Config{
-		Broker:          viper.GetString("redis_url"),
-		DefaultQueue:    "relay",
-		ResultBackend:   viper.GetString("redis_url"),
-		ResultsExpireIn: 5,
-	}
-	machineryServer, err = machinery.NewServer(machineryConfig)
-	if err != nil {
-		panic(err)
-	}
-
-	Actor.GenerateSelfKey(hostURL, &hostPrivatekey.PublicKey)
-	actorCache = cache.New(5*time.Minute, 10*time.Minute)
-	WebfingerResource.GenerateFromActor(hostURL, &Actor)
-	Nodeinfo.GenerateFromActor(hostURL, &Actor, version)
-
-	fmt.Println("Welcome to YUKIMOCHI Activity-Relay [Server]", version)
-	fmt.Println(" - Configurations")
-	fmt.Println("RELAY DOMAIN : ", hostURL.Host)
-	fmt.Println("REDIS URL : ", viper.GetString("redis_url"))
-	fmt.Println("BIND ADDRESS : ", viper.GetString("relay_bind"))
-	fmt.Println(" - Blocked Domain")
-	domains, _ := redisClient.HKeys("relay:config:blockedDomain").Result()
-	for _, domain := range domains {
-		fmt.Println(domain)
-	}
-	fmt.Println(" - Limited Domain")
-	domains, _ = redisClient.HKeys("relay:config:limitedDomain").Result()
-	for _, domain := range domains {
-		fmt.Println(domain)
-	}
+func init() {
+	cli.BuildNewCmd(cmdStart)
+	cmdStart.Flags().StringP("config", "c", "./config/config.ini", "Configure Path")
 }
 
 func main() {
-	// Load Config
-	initConfig()
+	cmdStart.Execute()
+}
 
-	http.HandleFunc("/.well-known/nodeinfo", handleNodeinfoLink)
-	http.HandleFunc("/.well-known/webfinger", handleWebfinger)
-	http.HandleFunc("/nodeinfo/2.1", handleNodeinfo)
-	http.HandleFunc("/actor", handleActor)
-	http.HandleFunc("/inbox", func(w http.ResponseWriter, r *http.Request) {
-		handleInbox(w, r, decodeActivity)
-	})
-	http.HandleFunc("/", HandleIndex)
-	go updateWebInfo()
-	http.ListenAndServe(viper.GetString("relay_bind"), nil)
+var cmdStart = &cobra.Command{
+	Use:   "",
+	Short: "Just a Small Relay",
+	Long:  "Relay",
+	RunE: func(cmd *cobra.Command, args []string) error {
+		configPath, _ := cmd.Flags().GetString("config")
+		err := loadConfigure(configPath)
+		if err != nil {
+			starlog.Errorln(err)
+			return err
+		}
+		stopCtx, stopFn := context.WithCancel(context.Background())
+		workChan := make(chan int)
+
+		err = ioutil.WriteFile("./config/relay.pid", []byte(fmt.Sprint(os.Getpid())), 0755)
+		if err != nil {
+			starlog.Errorln("Cannot Write Pid File", err)
+			return err
+		}
+		go server.Run(stopCtx)
+		go worker.Run(workChan)
+		sig := make(chan os.Signal)
+		signal.Notify(sig, os.Interrupt, os.Kill)
+		reloadSig := make(chan os.Signal)
+		signal.Notify(reloadSig, syscall.SIGUSR1)
+		for {
+			select {
+			case <-sig:
+				stopFn()
+				<-workChan
+				return nil
+			case <-workChan:
+				panic("quit unexpect!")
+			case <-reloadSig:
+				starlog.Infoln("Ok,Recv Reload Cfg Sig,Please Wait")
+				starlog.Noticeln("Please Note: Only Rules Can be Updated!")
+				err := loadConfigure(configPath)
+				if err != nil {
+					starlog.Errorln(err)
+				}
+				starlog.Infoln("Load Config Success!")
+			}
+		}
+
+		return nil
+	},
+}
+
+func loadConfigure(configPath string) error {
+	if !staros.Exists(configPath) {
+		starlog.Criticalln("Cannot Found Config File,Please Check")
+		return errors.New("Config File Not Exists")
+	}
+	starlog.Noticeln("Parsing Config File……")
+	if err := conf.Parse(configPath); err != nil {
+		starlog.Criticalln("Cannot Parse Configure File:", err)
+		return err
+	}
+	cfg := starmap.MustGet("config").(conf.RelayConfig)
+	cfg.Version = "1.0.0"
+	starmap.Store("ua", fmt.Sprintf("ActivityPub-Relay V%s +https://%s", cfg.Version, cfg.Domain))
+	starmap.Store("config", cfg)
+	fmt.Printf("Load Config :%+v\n", cfg)
+	return nil
 }

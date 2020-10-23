@@ -1,4 +1,4 @@
-package state
+package conf
 
 import (
 	"fmt"
@@ -125,6 +125,7 @@ func (config *RelayState) AddSubscription(domain Subscription) {
 func (config *RelayState) DelSubscription(domain string) {
 	config.RedisClient.Del("relay:subscription:" + domain).Result()
 	config.RedisClient.Del("relay:pending:" + domain).Result()
+	config.RedisClient.HDel("relay:info", domain).Result()
 
 	config.refresh()
 }
@@ -175,6 +176,17 @@ type Subscription struct {
 	InboxURL   string `json:"inbox_url,omitempty"`
 	ActivityID string `json:"activity_id,omitempty"`
 	ActorID    string `json:"actor_id,omitempty"`
+}
+
+type SubscriptionInfo struct {
+	Domain     string `json:"domain,omitempty"`
+	Name       string `json:"name,omitempty"`
+	Software   string `json:"software,omitempty"`
+	Version    string `json:"version,omitempty"`
+	TotalUser  int    `json:"totaluser,omitempty"`
+	ActiveUser int    `json:"activeuser,omitempty"`
+	Post       int    `json:"post,omitempty"`
+	Retry      int    `json:"retry,omitempty"`
 }
 
 type relayConfig struct {

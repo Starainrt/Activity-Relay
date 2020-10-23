@@ -1,4 +1,4 @@
-package main
+package worker
 
 import (
 	"crypto/rsa"
@@ -8,14 +8,16 @@ import (
 	"os"
 	"time"
 
+	"b612.me/starlog"
+	"b612.me/starmap"
 	"github.com/RichardKnop/machinery/v1"
 	"github.com/RichardKnop/machinery/v1/config"
 	"github.com/RichardKnop/machinery/v1/log"
 	"github.com/go-redis/redis"
 	uuid "github.com/satori/go.uuid"
-	"github.com/spf13/viper"
-	activitypub "github.com/yukimochi/Activity-Relay/ActivityPub"
-	keyloader "github.com/yukimochi/Activity-Relay/KeyLoader"
+	activitypub "github.com/starainrt/Activity-Relay/ActivityPub"
+	keyloader "github.com/starainrt/Activity-Relay/KeyLoader"
+	"github.com/starainrt/Activity-Relay/conf"
 )
 
 var (
@@ -53,34 +55,26 @@ func registorActivity(args ...string) error {
 }
 
 func initConfig() {
-	viper.SetConfigName("config")
-	viper.AddConfigPath(".")
-	err := viper.ReadInConfig()
-	if err != nil {
-		fmt.Println("Config file is not exists. Use environment variables.")
-		viper.BindEnv("actor_pem")
-		viper.BindEnv("redis_url")
-		viper.BindEnv("relay_bind")
-		viper.BindEnv("relay_domain")
-		viper.BindEnv("relay_servicename")
-	} else {
-		Actor.Summary = viper.GetString("relay_summary")
-		Actor.Icon = activitypub.Image{URL: viper.GetString("relay_icon")}
-		Actor.Image = activitypub.Image{URL: viper.GetString("relay_image")}
-	}
-	Actor.Name = viper.GetString("relay_servicename")
-
-	hostURL, _ = url.Parse("https://" + viper.GetString("relay_domain"))
-	hostPrivatekey, _ = keyloader.ReadPrivateKeyRSAfromPath(viper.GetString("actor_pem"))
-	redisOption, err := redis.ParseURL(viper.GetString("redis_url"))
+	cfg := starmap.MustGet("config").(conf.RelayConfig)
+	Actor.Summary = cfg.Summary
+	Actor.Icon = activitypub.Image{URL: cfg.Icon}
+	Actor.Image = activitypub.Image{URL: cfg.Image}
+	Actor.Name = cfg.Name
+	hostURL, _ = url.Parse("https://" + cfg.Domain)
+	hostPrivatekey, _ = keyloader.ReadPrivateKeyRSAfromPath(cfg.Key)
+	redisOption, err := redis.ParseURL(cfg.Redis)
 	if err != nil {
 		panic(err)
 	}
+
+	fmt.Printf("%v\n", cfg)
+	fmt.Println(cfg.Redis)
+
 	redisClient = redis.NewClient(redisOption)
 	machineryConfig := &config.Config{
-		Broker:          viper.GetString("redis_url"),
+		Broker:          cfg.Redis,
 		DefaultQueue:    "relay",
-		ResultBackend:   viper.GetString("redis_url"),
+		ResultBackend:   cfg.Redis,
 		ResultsExpireIn: 5,
 	}
 	machineryServer, err = machinery.NewServer(machineryConfig)
@@ -90,16 +84,12 @@ func initConfig() {
 	httpClient = &http.Client{Timeout: time.Duration(5) * time.Second}
 
 	Actor.GenerateSelfKey(hostURL, &hostPrivatekey.PublicKey)
-	newNullLogger := NewNullLogger()
+	newNullLogger := starlog.New(os.Stdout)
 	log.DEBUG = newNullLogger
 
-	fmt.Println("Welcome to YUKIMOCHI Activity-Relay [Worker]", version)
-	fmt.Println(" - Configurations")
-	fmt.Println("RELAY DOMAIN : ", hostURL.Host)
-	fmt.Println("REDIS URL : ", viper.GetString("redis_url"))
 }
 
-func main() {
+func Run(workChan chan int) {
 	initConfig()
 
 	err := machineryServer.RegisterTask("registor", registorActivity)
@@ -117,4 +107,5 @@ func main() {
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
 	}
+	workChan <- 1
 }

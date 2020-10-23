@@ -1,34 +1,12 @@
-package state
+package conf
 
 import (
-	"fmt"
-	"os"
 	"testing"
 
 	"github.com/go-redis/redis"
-	"github.com/spf13/viper"
 )
 
 var redisClient *redis.Client
-
-func TestMain(m *testing.M) {
-	viper.SetConfigName("config")
-	viper.AddConfigPath(".")
-	err := viper.ReadInConfig()
-	if err != nil {
-		fmt.Println("Config file is not exists. Use environment variables.")
-		viper.BindEnv("redis_url")
-	}
-	redisOption, err := redis.ParseURL(viper.GetString("redis_url"))
-	if err != nil {
-		panic(err)
-	}
-	redisClient = redis.NewClient(redisOption)
-
-	code := m.Run()
-	os.Exit(code)
-	redisClient.FlushAll().Result()
-}
 
 func TestLoadEmpty(t *testing.T) {
 	redisClient.FlushAll().Result()

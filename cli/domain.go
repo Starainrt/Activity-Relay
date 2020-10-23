@@ -1,12 +1,12 @@
-package main
+package cli
 
 import (
 	"encoding/json"
 	"fmt"
 
 	"github.com/spf13/cobra"
-	activitypub "github.com/yukimochi/Activity-Relay/ActivityPub"
-	state "github.com/yukimochi/Activity-Relay/State"
+	activitypub "github.com/starainrt/Activity-Relay/ActivityPub"
+	"github.com/starainrt/Activity-Relay/conf"
 )
 
 func domainCmdInit() *cobra.Command {
@@ -48,7 +48,7 @@ func domainCmdInit() *cobra.Command {
 	return domain
 }
 
-func createUnfollowRequestResponse(subscription state.Subscription) error {
+func createUnfollowRequestResponse(subscription conf.Subscription) error {
 	activity := activitypub.Activity{
 		Context: []string{"https://www.w3.org/ns/activitystreams", "https://w3id.org/security/v1"},
 		ID:      subscription.ActivityID,
@@ -65,6 +65,7 @@ func createUnfollowRequestResponse(subscription state.Subscription) error {
 }
 
 func listDomains(cmd *cobra.Command, args []string) error {
+	initConfig()
 	var domains []string
 	switch cmd.Flag("type").Value.String() {
 	case "limited":
@@ -89,6 +90,7 @@ func listDomains(cmd *cobra.Command, args []string) error {
 }
 
 func setDomainType(cmd *cobra.Command, args []string) error {
+	initConfig()
 	undo := cmd.Flag("undo").Value.String() == "true"
 	switch cmd.Flag("type").Value.String() {
 	case "limited":
@@ -117,6 +119,7 @@ func setDomainType(cmd *cobra.Command, args []string) error {
 }
 
 func unfollowDomains(cmd *cobra.Command, args []string) error {
+	initConfig()
 	subscriptions := relayState.Subscriptions
 	for _, domain := range args {
 		if contains(subscriptions, domain) {

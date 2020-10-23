@@ -15,12 +15,12 @@ html{font-size:100%;-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;box-
 <h1>Members</h1>
 <hr>
 </header>
-<p>以下为目前订阅了本中继服务的实例列表，列表每十分钟自动更新，并不完全反映最新的真实订阅情况，仅供参考。</p>
+<p>以下为目前订阅了本中继服务的实时列表。</p>
 <ul>
-{{ range .Domain }}
-<li>{{ . }}</li>
+{{ range .Info }}
+<li>{{ .Domain }} | ({{ .Software }} {{ .Version }} )   |  👥 {{ .TotalUser }} </li>
 {{ end }}
 </ul>
-<p>Updated {{ .Num }} instances at: {{ .Update }}</p>
+<p>Updated {{ .Num }} instances at: {{ .Date }}</p>
 </body>
 </html>

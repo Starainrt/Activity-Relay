@@ -4,6 +4,7 @@ import (
 	"crypto/rsa"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io/ioutil"
 	"net/http"
 	"net/url"
@@ -11,7 +12,7 @@ import (
 
 	cache "github.com/patrickmn/go-cache"
 	uuid "github.com/satori/go.uuid"
-	keyloader "github.com/yukimochi/Activity-Relay/KeyLoader"
+	keyloader "github.com/starainrt/Activity-Relay/KeyLoader"
 )
 
 // PublicKey : Activity Certificate.
@@ -44,6 +45,41 @@ type Actor struct {
 	PublicKey         PublicKey   `json:"publicKey,omitempty"`
 	Icon              Image       `json:"icon,omitempty"`
 	Image             Image       `json:"image,omitempty"`
+}
+
+// GeneratebackRequest : Generate follow response.
+func (activity *Activity) GeneratebackRequest(host *url.URL, action string) Activity {
+	if action != "Undo" {
+		return Activity{
+			[]string{"https://www.w3.org/ns/activitystreams"},
+			host.String() + "/activities/" + uuid.NewV4().String(),
+			host.String() + "/actor",
+			action,
+			activity.Actor,
+			[]string{activity.Actor},
+			nil,
+		}
+	} //cancelled
+	newUuid := uuid.NewV4().String()
+	UndoActivity := ActivityObject{
+		host.String() + "/activities/" + newUuid,
+		"Follow",
+		host.String() + "/actor",
+		host.String() + "/activities/" + uuid.NewV4().String(),
+		"cancelled",
+		activity.Actor,
+		[]string{activity.Actor},
+		nil,
+	}
+	return Activity{
+		[]string{"https://www.w3.org/ns/activitystreams"},
+		host.String() + "/activities/" + newUuid,
+		host.String() + "/actor",
+		action,
+		UndoActivity,
+		[]string{activity.Actor},
+		nil,
+	}
 }
 
 // GenerateSelfKey : Generate relay Actor from Publickey.
@@ -95,6 +131,39 @@ func (actor *Actor) RetrieveRemoteActor(url string, uaString string, cache *cach
 	return nil
 }
 
+func (actor *Actor) RetrieveRemoteActorSigned(url string, req *http.Request, cache *cache.Cache) error {
+	var err error
+	cacheData, found := cache.Get(url)
+	if found {
+		err = json.Unmarshal(cacheData.([]byte), &actor)
+		if err != nil {
+			cache.Delete(url)
+		} else {
+			return nil
+		}
+	}
+	req.Header.Set("Accept", "application/activity+json")
+	client := new(http.Client)
+	resp, err := client.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return errors.New(resp.Status)
+	}
+
+	data, _ := ioutil.ReadAll(resp.Body)
+	fmt.Println(string(data))
+	err = json.Unmarshal(data, &actor)
+	if err != nil {
+		return err
+	}
+	cache.Set(url, data, 5*time.Minute)
+	return nil
+}
+
 // Activity : ActivityPub Activity.
 type Activity struct {
 	Context interface{} `json:"@context,omitempty"`
@@ -114,7 +183,7 @@ func (activity *Activity) GenerateResponse(host *url.URL, responseType string) A
 		host.String() + "/actor",
 		responseType,
 		&activity,
-		nil,
+		[]string{activity.Actor},
 		nil,
 	}
 }
@@ -167,8 +236,10 @@ func (activity *Activity) NestedActivity() (*Activity, error) {
 type ActivityObject struct {
 	ID      string   `json:"id,omitempty"`
 	Type    string   `json:"type,omitempty"`
-	Name    string   `json:"name,omitempty"`
+	Actor   string   `json:"actor,omitempty"`
 	Content string   `json:"content,omitempty"`
+	State   string   `json:"state,omitempty"`
+	Object  string   `json:"object,omitempty"`
 	To      []string `json:"to,omitempty"`
 	Cc      []string `json:"cc,omitempty"`
 }

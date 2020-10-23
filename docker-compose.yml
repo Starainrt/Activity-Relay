@@ -8,33 +8,7 @@ services:
     volumes:
       - "./redisdata:/data"
 
-  worker:
-    build: .
-    image: yukimochi/activity-relay
-    restart: always
-    init: true
-    working_dir: /Activity-Relay/
-    command: worker
-    volumes:
-      - "./actor.pem:/actor.pem"
-      - "./config.yaml:/Activity-Relay/config.yaml"
-    depends_on:
-      - redis
-
-  spy:
-    build: .
-    image: yukimochi/activity-relay
-    restart: always
-    init: true
-    working_dir: /Activity-Relay/
-    command: spy
-    volumes:
-      - "./actor.pem:/actor.pem"
-      - "./config.yaml:/Activity-Relay/config.yaml"
-    depends_on:
-      - redis
-
-  server:
+  relay:
     build: .
     image: yukimochi/activity-relay
     restart: always
@@ -44,8 +18,6 @@ services:
     ports:
       - 127.0.0.1:8080:8080
     volumes:
-      - "./actor.pem:/actor.pem"
-      - "./config.yaml:/Activity-Relay/config.yaml"
-      - "./index.html:/Activity-Relay/index.html"
+      - "./config:/Activity-Relay/config"
     depends_on:
       - redis

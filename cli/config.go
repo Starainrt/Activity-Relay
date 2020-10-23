@@ -1,17 +1,22 @@
-package main
+package cli
 
 import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
 	"os"
+	"strconv"
+	"syscall"
+
+	"b612.me/starlog"
+	"b612.me/staros"
 
 	"github.com/spf13/cobra"
-	state "github.com/yukimochi/Activity-Relay/State"
+	"github.com/starainrt/Activity-Relay/conf"
 )
 
 const (
-	BlockService state.Config = iota
+	BlockService conf.Config = iota
 	ManuallyAccept
 	CreateAsAnnounce
 )
@@ -30,6 +35,14 @@ func configCmdInit() *cobra.Command {
 		Run:   listConfig,
 	}
 	config.AddCommand(configList)
+
+	var configReload = &cobra.Command{
+		Use:   "reload",
+		Short: "Reload relay  rule configration",
+		Long:  "Reload relay  rule configration.",
+		RunE:  reloadConfig,
+	}
+	config.AddCommand(configReload)
 
 	var configExport = &cobra.Command{
 		Use:   "export",
@@ -68,7 +81,26 @@ func configCmdInit() *cobra.Command {
 	return config
 }
 
+func reloadConfig(cmd *cobra.Command, args []string) error {
+	initConfig()
+	data, err := ioutil.ReadFile("./config/relay.pid")
+	if err != nil {
+		fmt.Println(data)
+		return err
+	}
+	pid, _ := strconv.Atoi(string(data))
+	_, err = staros.FindProcessByPid(int64(pid))
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+	syscall.Kill(pid, syscall.SIGUSR1)
+	starlog.Infoln("Already Send Reload Signal")
+	return nil
+}
+
 func configEnable(cmd *cobra.Command, args []string) error {
+	initConfig()
 	disable := cmd.Flag("disable").Value.String() == "true"
 	for _, config := range args {
 		switch config {
@@ -111,11 +143,13 @@ func listConfig(cmd *cobra.Command, args []string) {
 }
 
 func exportConfig(cmd *cobra.Command, args []string) {
+	initConfig()
 	jsonData, _ := json.Marshal(&relayState)
 	cmd.Println(string(jsonData))
 }
 
 func importConfig(cmd *cobra.Command, args []string) {
+	initConfig()
 	file, err := os.Open(cmd.Flag("json").Value.String())
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -126,7 +160,7 @@ func importConfig(cmd *cobra.Command, args []string) {
 		fmt.Fprintln(os.Stderr, err)
 		return
 	}
-	var data state.RelayState
+	var data conf.RelayState
 	err = json.Unmarshal(jsonData, &data)
 	if err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -154,7 +188,7 @@ func importConfig(cmd *cobra.Command, args []string) {
 		cmd.Println("Set [" + BlockedDomain + "] as blocked domain")
 	}
 	for _, Subscription := range data.Subscriptions {
-		relayState.AddSubscription(state.Subscription{
+		relayState.AddSubscription(conf.Subscription{
 			Domain:     Subscription.Domain,
 			InboxURL:   Subscription.InboxURL,
 			ActivityID: Subscription.ActivityID,
