@@ -95,7 +95,7 @@ func Run(stopCtx context.Context) {
 	go RecheckInstanceAcceptProcess(stopCtx)
 	go KickInstancesProcess(stopCtx)
 	go func() {
-		starlog.Infof("Now Listening On:%f\n", cfg.Listen)
+		starlog.Infof("Now Listening On:%s\n", cfg.Listen)
 		if err := httpServer.ListenAndServe(); err != http.ErrServerClosed {
 			starlog.Errorln("unexpect error: %v", err)
 		}
