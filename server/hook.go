@@ -21,7 +21,7 @@ func CheckShouldAccept(ip string, domain *url.URL, activity *activitypub.Activit
 	log := starlog.Std.NewFlag()
 	defer log.Close()
 	cfg := starmap.MustGet("config").(conf.RelayConfig)
-	info, err := UpdateInstancesInfo(domain.Host)
+	info, err := conf.UpdateInstancesInfo(domain.Host)
 	if err != nil {
 		log.Errorf("Cannot Get %s Instances Info ,Error is %v\n", domain, err)
 		relayState.RedisClient.HMSet("relay:autopending:"+domain.Host, map[string]interface{}{
@@ -61,7 +61,7 @@ func CheckShouldAccept(ip string, domain *url.URL, activity *activitypub.Activit
 //CheckShouldKick 0 no 1 yes 2  pending
 func CheckShouldKick(domain *url.URL, activity *activitypub.Activity, actor *activitypub.Actor) int {
 	cfg := starmap.MustGet("config").(conf.RelayConfig)
-	info, err := UpdateInstancesInfo(domain.Host)
+	info, err := conf.UpdateInstancesInfo(domain.Host)
 	if err != nil {
 		starlog.Noticeln("Pending,Cannot Get Instance Info")
 		return 2
@@ -126,7 +126,7 @@ func updateAllInstancesInfo() {
 		domainName := strings.Replace(domain, "relay:subscription:", "", 1)
 		oldInfo := GetInstancesInfo(domainName)
 		log.Debugf("%v\n", oldInfo)
-		info, err := UpdateInstancesInfo(domainName)
+		info, err := conf.UpdateInstancesInfo(domainName)
 		if err != nil {
 			log.Errorf("Cannot Update Instance %s Info,Reason is %v\n", domainName, err)
 			oldInfo.Retry++
@@ -204,7 +204,7 @@ func RecheckInstanceAcceptProcess(stopCtx context.Context) {
 			}
 			retry, _ := strconv.Atoi(domainInfo["retry"])
 			retry++
-			info, err := UpdateInstancesInfo(domain)
+			info, err := conf.UpdateInstancesInfo(domain)
 			if err != nil {
 				log.Errorln("Cannot Got Auto Pending Instance Info", domain, err)
 				if retry > 3 {

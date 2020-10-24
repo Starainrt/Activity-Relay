@@ -1,4 +1,4 @@
-package server
+package conf
 
 import (
 	"encoding/json"
@@ -7,7 +7,6 @@ import (
 
 	"b612.me/starmap"
 	"b612.me/starnet"
-	"github.com/starainrt/Activity-Relay/conf"
 )
 
 type MetaData struct {
@@ -31,13 +30,13 @@ type Users struct {
 	Active int `json:"activeMonth"`
 }
 
-func UpdateInstancesInfo(domain string) (conf.SubscriptionInfo, error) {
+func UpdateInstancesInfo(domain string) (SubscriptionInfo, error) {
 	defer func() {
 		recover()
 	}()
 	var wellKnown map[string]interface{}
 	var metadata MetaData
-	var info conf.SubscriptionInfo
+	var info SubscriptionInfo
 	wellknownUrl := "https://" + domain + "/.well-known/nodeinfo"
 	req := starnet.NewRequests(wellknownUrl, nil, "GET")
 	req.ReqHeader.Set("User-Agent", starmap.MustGet("ua").(string))

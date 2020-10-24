@@ -50,7 +50,7 @@ func loadConfigure(configPath string) error {
 }
 
 func initConfig() {
-	err := loadConfigure("./config.ini")
+	err := loadConfigure("./config/config.ini")
 	if err != nil {
 		fmt.Println(err)
 		os.Exit(1)

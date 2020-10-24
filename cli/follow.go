@@ -99,6 +99,11 @@ func createFollowRequestResponse(domain string, response string) error {
 		return err
 	}
 	pushRegistorJob(data["inbox_url"], jsonData)
+
+	resp = activity.GeneratebackRequest(hostname, "Follow")
+	jsonData, _ = json.Marshal(&resp)
+	pushRegistorJob(data["inbox_url"], jsonData)
+
 	relayState.RedisClient.Del("relay:pending:" + domain)
 	if response == "Accept" {
 		relayState.AddSubscription(conf.Subscription{
@@ -107,6 +112,12 @@ func createFollowRequestResponse(domain string, response string) error {
 			ActivityID: data["activity_id"],
 			ActorID:    data["actor"],
 		})
+	}
+
+	info, err := conf.UpdateInstancesInfo(domain)
+	if err == nil {
+		jsonInfo, _ := json.Marshal(info)
+		relayState.RedisClient.HSet("relay:info", domain, string(jsonInfo)).Result()
 	}
 
 	return nil

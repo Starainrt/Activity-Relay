@@ -56,9 +56,13 @@ func createUnfollowRequestResponse(subscription conf.Subscription) error {
 		Type:    "Follow",
 		Object:  "https://www.w3.org/ns/activitystreams#Public",
 	}
-
 	resp := activity.GenerateResponse(hostname, "Reject")
 	jsonData, _ := json.Marshal(&resp)
+	pushRegistorJob(subscription.InboxURL, jsonData)
+
+	//urls, _ := url.Parse("https://" + subscription.Domain)
+	resp = activity.GeneratebackRequest(hostname, "Undo")
+	jsonData, _ = json.Marshal(&resp)
 	pushRegistorJob(subscription.InboxURL, jsonData)
 
 	return nil
@@ -126,6 +130,8 @@ func unfollowDomains(cmd *cobra.Command, args []string) error {
 			subscription := *relayState.SelectSubscription(domain)
 			createUnfollowRequestResponse(subscription)
 			relayState.DelSubscription(subscription.Domain)
+			relayState.RedisClient.HDel("relay:info", domain).Result()
+
 			cmd.Println("Unfollow [" + subscription.Domain + "]")
 			break
 		} else {
